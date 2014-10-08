@@ -22,7 +22,9 @@
  ~ THE SOFTWARE.
  -->
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:p="/lib/hudson/project">
-  <st:include page="config-buildWrappers.jelly" class="${descriptor.clazz}" />
-  <st:include page="config-builders.jelly" class="${descriptor.clazz}" />
-  <st:include page="config-publishers2.jelly" class="${descriptor.clazz}" />
+    <f:withCustomDescriptorByName value="${h.currentDescriptorByNameUrl}/${it.descriptorByNameUrlSuffix}">
+        <st:include page="config-buildWrappers.jelly" class="${descriptor.clazz}"/>
+        <st:include page="config-builders.jelly" class="${descriptor.clazz}"/>
+        <st:include page="config-publishers2.jelly" class="${descriptor.clazz}"/>
+    </f:withCustomDescriptorByName>
 </j:jelly>

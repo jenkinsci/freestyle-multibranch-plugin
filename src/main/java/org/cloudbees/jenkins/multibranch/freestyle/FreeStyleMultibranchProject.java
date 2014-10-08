@@ -62,10 +62,15 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import jenkins.branch.BranchProperty;
+import jenkins.scm.api.SCMHead;
+import org.kohsuke.accmod.Restricted;
+import org.kohsuke.accmod.restrictions.NoExternalUse;
 
 /**
  * A multi-branch project that emulates a {@link hudson.model.FreeStyleProject}
@@ -89,6 +94,32 @@ public class FreeStyleMultibranchProject extends
     @Override
     protected BranchProjectFactory<ProjectImpl, BuildImpl> newProjectFactory() {
         return new ProjectFactoryImpl();
+    }
+
+    /**
+     * Provides a URL path which actually points back to {@code this} but interjects some {@link ProjectImpl} in the ancestor path for the benefit of build step descriptors.
+     */
+    @Restricted(NoExternalUse.class) // for ProjectFactoryImpl/config.jelly
+    public String getDescriptorByNameUrlSuffix() {
+        Collection<ProjectImpl> projects = getItems();
+        if (projects.isEmpty()) {
+            return "dummyBranch/parent";
+        } else {
+            String chosen = projects.iterator().next().getName(); // fallback
+            for (ProjectImpl p : projects) {
+                String n = p.getName();
+                // TODO would appreciate an API in SCMSource to find the main branch
+                if (/* Git */ n.equals("master") || /* SVN?? */ n.equals("trunk") || /* Hg */n.equals("default")) {
+                    chosen = n;
+                    break;
+                }
+            }
+            return getUrlChildPrefix() + "/" + chosen + "/parent";
+        }
+    }
+    @Restricted(NoExternalUse.class) // for Ancestor binding only
+    public ProjectImpl getDummyBranch() {
+        return new ProjectImpl(this);
     }
 
     /**
@@ -149,8 +180,9 @@ public class FreeStyleMultibranchProject extends
         /**
          * Prevent default constructor.
          */
-        private ProjectImpl() {
-            super(null, "");
+        private ProjectImpl(FreeStyleMultibranchProject parent) {
+            super(parent, "DUMMY");
+            branch = new Branch("DUMMY", new SCMHead("DUMMY"), new NullSCM(), Collections.<BranchProperty>emptyList());
         }
 
         /**
@@ -357,7 +389,7 @@ public class FreeStyleMultibranchProject extends
         /**
          * Hack to let us get some descriptors.
          */
-        private static final ProjectImpl DUMMY = new ProjectImpl();
+        private static final ProjectImpl DUMMY = new ProjectImpl(null);
 
         /**
          * List of active {@link Builder}s configured for this project.
