@@ -9,9 +9,6 @@ See also this [plugin's wiki page][wiki]
 # History
 
 When developing the idea of the literate project type, this project type was the first experiment on the road.
-The issue (currently unresolved) is that a lot of the Jenkins build steps and publishers have an implicit assumption
-that their parent is an AbstractProject and thus you find a lot of NullPointerExceptions thrown while trying to 
-configure this job type.
 
 # Environment
 
