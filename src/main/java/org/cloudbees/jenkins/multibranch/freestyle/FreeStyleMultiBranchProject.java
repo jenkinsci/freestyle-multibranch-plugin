@@ -27,6 +27,7 @@ package org.cloudbees.jenkins.multibranch.freestyle;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.DescriptorExtensionList;
 import hudson.Extension;
+import hudson.FilePath;
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Build;
@@ -303,7 +304,7 @@ public class FreeStyleMultiBranchProject extends
         @Override
         // TODO - Hack - child items of an item group that is a view container must implement TopLevelItem
         public TopLevelItemDescriptor getDescriptor() {
-            return (TopLevelItemDescriptor) Jenkins.getInstance().getDescriptorOrDie(ProjectImpl.class);
+            return (TopLevelItemDescriptor) Jenkins.getActiveInstance().getDescriptorOrDie(ProjectImpl.class);
         }
 
         /**
@@ -380,9 +381,14 @@ public class FreeStyleMultiBranchProject extends
             @Override
             protected WorkspaceList.Lease decideWorkspace(Node n, WorkspaceList wsl)
                     throws InterruptedException, IOException {
-                // TODO: this cast is indicative of abstraction problem
-                final ProjectImpl project = (ProjectImpl) getProject();
-                return wsl.allocate(n.getWorkspaceFor(project.getParent()).child(project.getName()));
+                final ProjectImpl project = getProject();
+
+                FilePath parentWorkspace = n.getWorkspaceFor(project.getParent());
+                if (parentWorkspace == null) {
+                    throw new IllegalStateException("node " + n.getNodeName() + "is no longer connected");
+                }
+
+                return wsl.allocate(parentWorkspace.child(project.getName()));
             }
 
         }
