@@ -200,7 +200,7 @@ public class FreeStyleMultibranchProject extends
                            Map<Descriptor<BuildWrapper>, BuildWrapper> buildWrappers,
                            DescribableList<Builder, Descriptor<Builder>> builders,
                            Map<Descriptor<Publisher>, Publisher> publishers) {
-            super(parent, branch.getName());
+            super(parent, branch.getEncodedName());
             this.branch = branch;
             this.properties.replaceBy(properties);
 
@@ -254,6 +254,14 @@ public class FreeStyleMultibranchProject extends
          */
         @Override
         public String getName() {
+            return branch.getEncodedName();
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public String getDisplayName() {
             return branch.getName();
         }
 
