@@ -27,6 +27,7 @@ package org.cloudbees.jenkins.multibranch.freestyle;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.DescriptorExtensionList;
 import hudson.Extension;
+import hudson.FilePath;
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Build;
@@ -75,15 +76,15 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
 /**
  * A multi-branch project that emulates a {@link hudson.model.FreeStyleProject}
  */
-public class FreeStyleMultibranchProject extends
-        MultiBranchProject<FreeStyleMultibranchProject.ProjectImpl, FreeStyleMultibranchProject.BuildImpl> {
+public class FreeStyleMultiBranchProject extends
+        MultiBranchProject<FreeStyleMultiBranchProject.ProjectImpl, FreeStyleMultiBranchProject.BuildImpl> {
     /**
      * Our constructor
      *
      * @param parent the parent of this project.
      * @param name   the name of this project.
      */
-    public FreeStyleMultibranchProject(ItemGroup parent, String name) {
+    public FreeStyleMultiBranchProject(ItemGroup parent, String name) {
         super(parent, name);
     }
 
@@ -133,7 +134,7 @@ public class FreeStyleMultibranchProject extends
          */
         @Override
         public String getDisplayName() {
-            return Messages.FreeStyleMultibranchProject_DisplayName();
+            return Messages.FreeStyleMultiBranchProject_DisplayName();
         }
 
         /**
@@ -141,7 +142,7 @@ public class FreeStyleMultibranchProject extends
          */
         @Override
         public TopLevelItem newInstance(ItemGroup parent, String name) {
-            return new FreeStyleMultibranchProject(parent, name);
+            return new FreeStyleMultiBranchProject(parent, name);
         }
 
         /**
@@ -180,7 +181,7 @@ public class FreeStyleMultibranchProject extends
         /**
          * Prevent default constructor.
          */
-        private ProjectImpl(FreeStyleMultibranchProject parent) {
+        private ProjectImpl(FreeStyleMultiBranchProject parent) {
             super(parent, "DUMMY");
             branch = new Branch("DUMMY", new SCMHead("DUMMY"), new NullSCM(), Collections.<BranchProperty>emptyList());
         }
@@ -195,12 +196,12 @@ public class FreeStyleMultibranchProject extends
          * @param builders      the builders.
          * @param publishers    the publishers.
          */
-        public ProjectImpl(FreeStyleMultibranchProject parent, Branch branch,
+        public ProjectImpl(FreeStyleMultiBranchProject parent, Branch branch,
                            List<JobProperty<? super ProjectImpl>> properties,
                            Map<Descriptor<BuildWrapper>, BuildWrapper> buildWrappers,
                            DescribableList<Builder, Descriptor<Builder>> builders,
                            Map<Descriptor<Publisher>, Publisher> publishers) {
-            super(parent, branch.getName());
+            super(parent, branch.getEncodedName());
             this.branch = branch;
             this.properties.replaceBy(properties);
 
@@ -245,8 +246,8 @@ public class FreeStyleMultibranchProject extends
          * {@inheritDoc}
          */
         @Override
-        public FreeStyleMultibranchProject getParent() {
-            return (FreeStyleMultibranchProject) super.getParent();
+        public FreeStyleMultiBranchProject getParent() {
+            return (FreeStyleMultiBranchProject) super.getParent();
         }
 
         /**
@@ -254,6 +255,14 @@ public class FreeStyleMultibranchProject extends
          */
         @Override
         public String getName() {
+            return branch.getEncodedName();
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public String getDisplayName() {
             return branch.getName();
         }
 
@@ -295,7 +304,7 @@ public class FreeStyleMultibranchProject extends
         @Override
         // TODO - Hack - child items of an item group that is a view container must implement TopLevelItem
         public TopLevelItemDescriptor getDescriptor() {
-            return (TopLevelItemDescriptor) Jenkins.getInstance().getDescriptorOrDie(ProjectImpl.class);
+            return (TopLevelItemDescriptor) Jenkins.getActiveInstance().getDescriptorOrDie(ProjectImpl.class);
         }
 
         /**
@@ -372,9 +381,14 @@ public class FreeStyleMultibranchProject extends
             @Override
             protected WorkspaceList.Lease decideWorkspace(Node n, WorkspaceList wsl)
                     throws InterruptedException, IOException {
-                // TODO: this cast is indicative of abstraction problem
-                final ProjectImpl project = (ProjectImpl) getProject();
-                return wsl.allocate(n.getWorkspaceFor(project.getParent()).child(project.getName()));
+                final ProjectImpl project = getProject();
+
+                FilePath parentWorkspace = n.getWorkspaceFor(project.getParent());
+                if (parentWorkspace == null) {
+                    throw new IllegalStateException("node " + n.getNodeName() + "is no longer connected");
+                }
+
+                return wsl.allocate(parentWorkspace.child(project.getName()));
             }
 
         }
@@ -462,7 +476,7 @@ public class FreeStyleMultibranchProject extends
          */
         @Override
         public ProjectImpl newInstance(Branch branch) {
-            return new ProjectImpl((FreeStyleMultibranchProject) getOwner(),
+            return new ProjectImpl((FreeStyleMultiBranchProject) getOwner(),
                     branch,
                     Collections.<JobProperty<? super ProjectImpl>>emptyList(),
                     Descriptor.toMap(buildWrappers),
@@ -550,7 +564,7 @@ public class FreeStyleMultibranchProject extends
              */
             @Override
             public boolean isApplicable(Class<? extends MultiBranchProject> clazz) {
-                return FreeStyleMultibranchProject.class.isAssignableFrom(clazz);
+                return FreeStyleMultiBranchProject.class.isAssignableFrom(clazz);
             }
         }
     }
@@ -561,7 +575,7 @@ public class FreeStyleMultibranchProject extends
     @Initializer(before = InitMilestone.PLUGINS_STARTED)
     @SuppressWarnings("unused") // invoked by Jenkins
     public static void registerXStream() {
-        Items.XSTREAM.alias("freestyle-multibranch", FreeStyleMultibranchProject.class);
+        Items.XSTREAM.alias("freestyle-multibranch", FreeStyleMultiBranchProject.class);
         Items.XSTREAM.alias("freestyle-branch", ProjectImpl.class);
     }
 }
