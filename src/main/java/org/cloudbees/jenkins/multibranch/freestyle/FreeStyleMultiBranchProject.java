@@ -24,6 +24,7 @@
 
 package org.cloudbees.jenkins.multibranch.freestyle;
 
+import com.cloudbees.hudson.plugins.folder.computed.ComputedFolder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.DescriptorExtensionList;
 import hudson.Extension;
@@ -32,7 +33,6 @@ import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Build;
 import hudson.model.Descriptor;
-import hudson.model.Item;
 import hudson.model.ItemGroup;
 import hudson.model.Items;
 import hudson.model.JobProperty;
@@ -43,41 +43,44 @@ import hudson.model.TopLevelItem;
 import hudson.model.TopLevelItemDescriptor;
 import hudson.scm.NullSCM;
 import hudson.scm.SCM;
-import hudson.scm.SCMDescriptor;
 import hudson.security.Permission;
 import hudson.slaves.WorkspaceList;
-import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildWrapper;
-import hudson.tasks.BuildWrappers;
 import hudson.tasks.Builder;
 import hudson.tasks.Publisher;
 import hudson.util.DescribableList;
+import javax.servlet.ServletException;
 import jenkins.branch.Branch;
 import jenkins.branch.BranchProjectFactory;
-import jenkins.branch.BranchProjectFactoryDescriptor;
 import jenkins.branch.MultiBranchProject;
 import jenkins.branch.MultiBranchProjectDescriptor;
 import jenkins.model.Jenkins;
-import org.kohsuke.stapler.DataBoundConstructor;
+import jenkins.scm.api.SCMSource;
+import jenkins.scm.api.SCMSourceCriteria;
+import net.sf.json.JSONObject;
+import org.jenkins.ui.icon.Icon;
+import org.jenkins.ui.icon.IconSet;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import jenkins.branch.BranchProperty;
 import jenkins.scm.api.SCMHead;
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
+import org.kohsuke.stapler.StaplerRequest;
+import org.kohsuke.stapler.StaplerResponse;
 
 /**
  * A multi-branch project that emulates a {@link hudson.model.FreeStyleProject}
  */
 public class FreeStyleMultiBranchProject extends
         MultiBranchProject<FreeStyleMultiBranchProject.ProjectImpl, FreeStyleMultiBranchProject.BuildImpl> {
+    private FreeStyleSCMSourceCriteria scmSourceCriteria = new AllFreeStyleSCMSourceCriteria();
+
     /**
      * Our constructor
      *
@@ -91,10 +94,29 @@ public class FreeStyleMultiBranchProject extends
     /**
      * {@inheritDoc}
      */
+    @Override
+    public SCMSourceCriteria getSCMSourceCriteria(@NonNull SCMSource source) {
+        return scmSourceCriteria instanceof AllFreeStyleSCMSourceCriteria ? null : scmSourceCriteria;
+    }
+
+    @NonNull
+    public FreeStyleSCMSourceCriteria getScmSourceCriteria() {
+        return scmSourceCriteria == null ? new AllFreeStyleSCMSourceCriteria() : scmSourceCriteria;
+    }
+
+    public void setScmSourceCriteria(FreeStyleSCMSourceCriteria scmSourceCriteria) {
+        if (this.scmSourceCriteria == null ? scmSourceCriteria != null : !this.scmSourceCriteria.equals(scmSourceCriteria)) {
+            this.scmSourceCriteria = scmSourceCriteria;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @NonNull
     @Override
     protected BranchProjectFactory<ProjectImpl, BuildImpl> newProjectFactory() {
-        return new ProjectFactoryImpl();
+        return new FreeStyleProjectFactory();
     }
 
     /**
@@ -123,6 +145,23 @@ public class FreeStyleMultiBranchProject extends
         return new ProjectImpl(this);
     }
 
+    @Override
+    protected void submit(StaplerRequest req, StaplerResponse rsp)
+            throws IOException, ServletException, Descriptor.FormException {
+        super.submit(req, rsp);
+        JSONObject json = req.getSubmittedForm();
+        if (json.has("scmSourceCriteria")) {
+            FreeStyleSCMSourceCriteria scmSourceCriteria =
+                    req.bindJSON(FreeStyleSCMSourceCriteria.class, json.getJSONObject("scmSourceCriteria"));
+            if (this.scmSourceCriteria == null
+                    ? scmSourceCriteria != null
+                    : !this.scmSourceCriteria.equals(scmSourceCriteria)) {
+                this.scmSourceCriteria = scmSourceCriteria;
+                recalculateAfterSubmitted(true);
+            }
+        }
+    }
+
     /**
      * Our descriptor.
      */
@@ -137,6 +176,20 @@ public class FreeStyleMultiBranchProject extends
             return Messages.FreeStyleMultiBranchProject_DisplayName();
         }
 
+        public String getDescription() {
+            return Messages.FreeStyleMultiBranchProject_Description();
+        }
+
+
+        public String getIconFilePathPattern() {
+            return "plugin/freestyle-multibranch/images/:size/freestyle-multibranch.png";
+        }
+
+        @Override
+        public String getIconClassName() {
+            return "icon-freestyle-multibranch-project";
+        }
+
         /**
          * {@inheritDoc}
          */
@@ -145,20 +198,23 @@ public class FreeStyleMultiBranchProject extends
             return new FreeStyleMultiBranchProject(parent, name);
         }
 
-        /**
-         * {@inheritDoc}
-         */
-        @NonNull
-        @Override
-        public List<SCMDescriptor<?>> getSCMDescriptors() {
-            List<SCMDescriptor<?>> result = new ArrayList<SCMDescriptor<?>>(SCM.all());
-            for (Iterator<SCMDescriptor<?>> iterator = result.iterator(); iterator.hasNext(); ) {
-                SCMDescriptor<?> d = iterator.next();
-                if (NullSCM.class.equals(d.clazz)) {
-                    iterator.remove();
-                }
-            }
-            return result; // todo figure out filtering
+        static {
+            IconSet.icons.addIcon(
+                    new Icon("icon-freestyle-multibranch-project icon-sm",
+                            "plugin/freestyle-multibranch/images/16x16/freestyle-multibranch.png",
+                            Icon.ICON_SMALL_STYLE));
+            IconSet.icons.addIcon(
+                    new Icon("icon-freestyle-multibranch-project icon-md",
+                            "plugin/freestyle-multibranch/images/24x24/freestyle-multibranch.png",
+                            Icon.ICON_MEDIUM_STYLE));
+            IconSet.icons.addIcon(
+                    new Icon("icon-freestyle-multibranch-project icon-lg",
+                            "plugin/freestyle-multibranch/images/32x32/freestyle-multibranch.png",
+                            Icon.ICON_LARGE_STYLE));
+            IconSet.icons.addIcon(
+                    new Icon("icon-freestyle-multibranch-project icon-xlg",
+                            "plugin/freestyle-multibranch/images/48x48/freestyle-multibranch.png",
+                            Icon.ICON_XLARGE_STYLE));
         }
     }
 
@@ -181,7 +237,7 @@ public class FreeStyleMultiBranchProject extends
         /**
          * Prevent default constructor.
          */
-        private ProjectImpl(FreeStyleMultiBranchProject parent) {
+        /*package*/ ProjectImpl(ComputedFolder<?> parent) {
             super(parent, "DUMMY");
             branch = new Branch("DUMMY", new SCMHead("DUMMY"), new NullSCM(), Collections.<BranchProperty>emptyList());
         }
@@ -298,6 +354,10 @@ public class FreeStyleMultiBranchProject extends
             return BuildImpl.class;
         }
 
+        public Branch getBranch() {
+            return branch;
+        }
+
         /**
          * {@inheritDoc}
          */
@@ -305,6 +365,10 @@ public class FreeStyleMultiBranchProject extends
         // TODO - Hack - child items of an item group that is a view container must implement TopLevelItem
         public TopLevelItemDescriptor getDescriptor() {
             return (TopLevelItemDescriptor) Jenkins.getActiveInstance().getDescriptorOrDie(ProjectImpl.class);
+        }
+
+        public void setBranch(Branch branch) {
+            this.branch = branch;
         }
 
         /**
@@ -393,180 +457,6 @@ public class FreeStyleMultiBranchProject extends
 
         }
 
-    }
-
-    /**
-     * The factory that creates the per-branch projects.
-     */
-    public static class ProjectFactoryImpl extends BranchProjectFactory<ProjectImpl, BuildImpl> {
-
-        /**
-         * Hack to let us get some descriptors.
-         */
-        private static final ProjectImpl DUMMY = new ProjectImpl(null);
-
-        /**
-         * List of active {@link Builder}s configured for this project.
-         */
-        private final DescribableList<Builder, Descriptor<Builder>> builders =
-                new DescribableList<Builder, Descriptor<Builder>>(this);
-
-        /**
-         * List of active {@link Publisher}s configured for this project.
-         */
-        private final DescribableList<Publisher, Descriptor<Publisher>> publishers =
-                new DescribableList<Publisher, Descriptor<Publisher>>(this);
-
-        /**
-         * List of active {@link BuildWrapper}s configured for this project.
-         */
-        private final DescribableList<BuildWrapper, Descriptor<BuildWrapper>> buildWrappers =
-                new DescribableList<BuildWrapper, Descriptor<BuildWrapper>>(this);
-
-        /**
-         * Our constructor.
-         */
-        public ProjectFactoryImpl() {
-        }
-
-        /**
-         * Stapler's constructor.
-         */
-        @SuppressWarnings("unused") // used by stapler
-        @DataBoundConstructor
-        public ProjectFactoryImpl(List<Builder> builders, List<BuildWrapper> buildWrappers, List<Publisher> publishers)
-                throws IOException {
-            if (builders != null) {
-                this.builders.replaceBy(builders);
-            }
-            if (buildWrappers != null) {
-                this.buildWrappers.replaceBy(buildWrappers);
-            }
-            if (publishers != null) {
-                this.publishers.replaceBy(publishers);
-            }
-        }
-
-        /**
-         * Accessor for stapler.
-         */
-        @SuppressWarnings("unused") // used by stapler
-        public DescribableList<Builder, Descriptor<Builder>> getBuilders() {
-            return builders;
-        }
-
-        /**
-         * Accessor for stapler.
-         */
-        @SuppressWarnings("unused") // used by stapler
-        public DescribableList<BuildWrapper, Descriptor<BuildWrapper>> getBuildWrappers() {
-            return buildWrappers;
-        }
-
-        /**
-         * Accessor for stapler.
-         */
-        @SuppressWarnings("unused") // used by stapler
-        public DescribableList<Publisher, Descriptor<Publisher>> getPublishers() {
-            return publishers;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public ProjectImpl newInstance(Branch branch) {
-            return new ProjectImpl((FreeStyleMultiBranchProject) getOwner(),
-                    branch,
-                    Collections.<JobProperty<? super ProjectImpl>>emptyList(),
-                    Descriptor.toMap(buildWrappers),
-                    builders,
-                    Descriptor.toMap(publishers));
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @NonNull
-        @Override
-        public ProjectImpl setBranch(
-                @NonNull ProjectImpl project, @NonNull Branch branch) {
-            if (!project.branch.equals(branch)) {
-                project.branch = branch;
-                try {
-                    project.save();
-                } catch (IOException e) {
-                    // TODO log
-                }
-            } else {
-                project.branch = branch;
-            }
-            return project;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public boolean isProject(Item item) {
-            return item instanceof ProjectImpl;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @NonNull
-        @Override
-        public Branch getBranch(@NonNull ProjectImpl project) {
-            return project.branch;
-        }
-
-        /**
-         * Our descriptor.
-         */
-        @Extension
-        public static class DescriptorImpl extends BranchProjectFactoryDescriptor {
-
-            /**
-             * {@inheritDoc}
-             */
-            @Override
-            public String getDisplayName() {
-                return "Fixed configuration";
-            }
-
-            /**
-             * Accessor for stapler.
-             */
-            @SuppressWarnings("unused") // used by stapler
-            public static List<Descriptor<BuildWrapper>> getBuildWrapperDescriptors() {
-                return BuildWrappers.getFor(DUMMY);
-            }
-
-            /**
-             * Accessor for stapler.
-             */
-            @SuppressWarnings("unused") // used by stapler
-            public static List<Descriptor<Builder>> getBuilderDescriptors() {
-                return BuildStepDescriptor.filter(Builder.all(), ProjectImpl.class);
-            }
-
-            /**
-             * Accessor for stapler.
-             */
-            @SuppressWarnings("unused") // used by stapler
-            public static List<Descriptor<Publisher>> getPublisherDescriptors() {
-                return BuildStepDescriptor.filter(Publisher.all(), ProjectImpl.class);
-            }
-
-            /**
-             * {@inheritDoc}
-             */
-            @Override
-            public boolean isApplicable(Class<? extends MultiBranchProject> clazz) {
-                return FreeStyleMultiBranchProject.class.isAssignableFrom(clazz);
-            }
-        }
     }
 
     /**

@@ -1,7 +1,7 @@
 <!--
  ~ The MIT License
  ~
- ~ Copyright (c) 2011-2014, CloudBees, Inc., Stephen Connolly.
+ ~ Copyright (c) 2011-2016, CloudBees, Inc., Stephen Connolly.
  ~
  ~ Permission is hereby granted, free of charge, to any person obtaining a copy
  ~ of this software and associated documentation files (the "Software"), to deal
@@ -21,10 +21,15 @@
  ~ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  ~ THE SOFTWARE.
  -->
-<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:p="/lib/hudson/project">
-    <f:withCustomDescriptorByName value="${h.currentDescriptorByNameUrl}/${it.descriptorByNameUrlSuffix}">
-        <st:include page="config-buildWrappers.jelly" class="${descriptor.clazz}"/>
-        <st:include page="config-builders.jelly" class="${descriptor.clazz}"/>
-        <st:include page="config-publishers2.jelly" class="${descriptor.clazz}"/>
-    </f:withCustomDescriptorByName>
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout"
+         xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:p="/lib/hudson/project" xmlns:branch="/lib/branch-api">
+  <f:section title="${%Recognition}">
+  <f:block>
+      <f:dropdownDescriptorSelector title="${%Criteria}" field="scmSourceCriteria"/>
+  </f:block>
+  </f:section>
+  <f:section title="${%Configuration}">
+      <f:dropdownDescriptorSelector field="factory" title="${%Mode}"/>
+    </f:section>
 </j:jelly>
