@@ -61,9 +61,9 @@
   </prerequisites>
 
   <scm>
-    <connection>scm:git:git://github.com/jenkinsci/literate-plugin.git</connection>
-    <developerConnection>scm:git:git@github.com:jenkinsci/literate-plugin.git</developerConnection>
-    <url>http://github.com/jenkinsci/literate-plugin</url>
+    <connection>scm:git:git://github.com/jenkinsci/freestyle-multibranch-plugin.git</connection>
+    <developerConnection>scm:git:git@github.com:jenkinsci/freestyle-multibranch-plugin.git</developerConnection>
+    <url>http://github.com/jenkinsci/freestyle-multibranch-plugin</url>
     <tag>HEAD</tag>
   </scm>
 
